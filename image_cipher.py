@@ -2,139 +2,120 @@
 from PIL import Image
 import numpy as np
 import os
+import json
 
-letter_to_number = {
-    'a': 1,
-    'b': 2,
-    'c': 3,
-    'd': 4,
-    'e': 5,
-    'f': 6,
-    'g': 7,
-    'h': 8,
-    'i': 9,
-    'j': 10,
-    'k': 11,
-    'l': 12,
-    'm': 13,
-    'n': 14,
-    'o': 15,
-    'p': 16,
-    'r': 17,
-    's': 18,
-    't': 19,
-    'u': 20,
-    'w': 21,
-    'x': 22,
-    'y': 23,
-    'z': 24,
-    'v': 25,
-    ' ': 26,
-    '*': 27,
-}
+class PixelCipher:
 
-number_to_letter = {
-    1: 'a',
-    2: 'b',
-    3: 'c',
-    4: 'd',
-    5: 'e',
-    6: 'f',
-    7: 'g',
-    8: 'h',
-    9: 'i',
-    10: 'j',
-    11: 'k',
-    12: 'l',
-    13: 'm',
-    14: 'n',
-    15: 'o',
-    16: 'p',
-    17: 'r',
-    18: 's',
-    19: 't',
-    20: 'u',
-    21: 'w',
-    22: 'x',
-    23: 'y',
-    24: 'z',
-    25: 'v',
-    26: ' ',
-    27: '*',
-}
+    def __init__(self):
+        self.CFG = self.load_config()
+
+    def load_config(self):
+        with open('config/decoding_table.json', 'r') as msg:
+            cfg = json.load(msg)
+        return cfg
+
+    def img_to_pixels_array(self, img_path):
+        if not os.path.exists(img_path):
+            raise  FileExistsError
+        img = Image.open(img_path)
+        array = np.array(img)
+        return array
+
+    def pixels_to_img(self, pixels_array):
+        img = Image.fromarray(pixels_array)
+        return img
+
+    def pair_pixels(self, row):
+        return zip(row[0::2], row[1::2])
 
 
-def path_to_save_convert_image(root_path=""):
+class CodePixel(PixelCipher):
 
-    if os.path.exists(root_path):
-        path = os.path.join(root_path,"convert_" + os.path.basename(img_src))
-        return path
-    else:
-        raise FileExistsError
+    def __init__(self, img, msg):
+        super().__init__()
+        self.letter_to_number = self.CFG["letter_to_number"]
+        self.pixels_array = self.coded_img(img, msg)
+        self.save_img(self.pixels_to_img(self.pixels_array))
 
-def img_to_array(img_src):
+    def path_to_save_convert_image(self):
+        path = os.path.join(self.CFG["path_to_save_coded_img"])
+        if os.path.exists(path):
+            path = os.path.join(path, self.CFG["name_convert_img"] + "." + self.CFG["extension"])
+            return path
+        else:
+            raise FileExistsError
 
-    img = Image.open(img_src)
-    array = np.array(img)
-    return array
+    def save_img(self, img):
+        path = os.path.join(self.path_to_save_convert_image())
+        img.save(path)
 
-def array_to_image(img_array):
-    img = Image.fromarray(img_array)
-    img.save("convert.png")
+    def is_rgb_overload(self, pixel_first, pixel_second):
+        is_overload_rgb = False
+        is_overload = lambda pixel :any([ elem > 254 for elem in pixel])
 
-def pair_pixels(row):
-    return zip(row[0::2], row[1::2])
+        if is_overload(pixel_first) or is_overload(pixel_second):
+            is_overload_rgb = True
+        return is_overload_rgb
 
-def is_rgb_overload(pixel_x, pixel_y):
+    def code_letter_to_bin(self, msg):
+        for elem in msg:
+            yield '{:06b}'.format(self.letter_to_number[elem])
 
-    is_overload_rgb = False
-    is_overload = lambda pixel :any([ elem > 254 for elem in pixel])
+    def coded_pixel(self, to_code, first_pixel, second_pixel):
+        iteration = 0
+        for elem in to_code:
+            if elem == '1':
+                if iteration > 2:
+                    second_pixel[iteration - 3] += 1
+                elif elem == '1':
+                    first_pixel[iteration] += 1
+            iteration += 1
 
-    if is_overload(pixel_x) or is_overload(pixel_y):
-        is_overload_rgb = True
-    return is_overload_rgb
-
-def code_letter_to_bin(msg):
-    for elem in msg:
-        yield '{:06b}'.format(letter_to_number[elem])
-
-def code_pixe(to_code, first_pixel, second_pixel):
-    iteration = 0
-    for elem in to_code:
-        if elem == '1':
-            if iteration > 2:
-                second_pixel[iteration-3] += 1
-            elif elem == '1':
-                first_pixel[iteration] += 1
-        iteration += 1
-
-def decoded_pixel(pair_pixel, pair_coded_pixel):
-    orginal = [*pair_pixel[0], *pair_pixel[1]]
-    coded = [*pair_coded_pixel[0], *pair_coded_pixel[1]]
-    code = ''
-    for org, cod in zip(orginal,coded):
-        code+=(str(cod-org))
-    if int(code,2) in number_to_letter.keys():
-        decoded_pixel = number_to_letter[(int(code,2))]
-    else:
-        decoded_pixel = ''
-    return decoded_pixel
+    def coded_img(self, img_path, msg):
+        img_array = self.img_to_pixels_array(img_path)
+        get_code_letter = iter(self.code_letter_to_bin(msg))
+        for row in img_array:
+            for first_pixel, second_pixel in self.pair_pixels(row):
+                if not self.is_rgb_overload(first_pixel, second_pixel):
+                    try:
+                        to_code = next(get_code_letter)
+                        self.coded_pixel(to_code, first_pixel, second_pixel)
+                    except StopIteration:
+                        return img_array
 
 
-def coded_img(img_src, message):
 
-    img_array = img_to_array(img_src)
-    get_code_letter = iter(code_letter_to_bin(message))
+class DecodedPixel(PixelCipher):
 
-    for row in img_array:
-        for first_pixel, second_pixel in pair_pixels(row):
-            if not is_rgb_overload(first_pixel, second_pixel):
-                try:
-                    to_code = next(get_code_letter)
-                    code_pixe(to_code, first_pixel, second_pixel)
-                except StopIteration:
-                    print('end coding')
-                    return img_array
+    def __init__(self, img_orginal, img_coded):
+        super().__init__()
+        self.number_to_letter = self.CFG["number_to_letter"]
+        self.decoded_msg = self.decoded_img(img_orginal, img_coded)
+
+    def __str__(self):
+        return self.decoded_msg
+
+    def decoded_pixel(self, pair_pixel, pair_coded_pixel):
+        orginal = [*pair_pixel[0], *pair_pixel[1]]
+        coded = [*pair_coded_pixel[0], *pair_coded_pixel[1]]
+        code = ''
+        for org, cod in zip(orginal, coded):
+            code += (str(cod - org))
+        if str(int(code, 2)) in self.number_to_letter.keys():
+            decoded_pixel = self.number_to_letter[str((int(code, 2)))]
+        else:
+            decoded_pixel = ''
+        return decoded_pixel
+
+
+    def decoded_img(self, img_path, coded_img_path):
+        img_array = self.img_to_pixels_array(img_path)
+        coded_img_array = self.img_to_pixels_array(coded_img_path)
+        msg = ''
+        for row, coded_row in zip(img_array, coded_img_array):
+            for pair_pixel, pair_pixel_coded in zip(self.pair_pixels(row), self.pair_pixels(coded_row)):
+                msg += self.decoded_pixel(pair_pixel, pair_pixel_coded)
+        return msg
 
 
 class Message:
@@ -179,16 +160,6 @@ class Message:
         return False
 
 
-
-
-def decoded_img(img_path, coded_img_path):
-
-    img_array =  img_to_array(img_path)
-    coded_img_array = img_to_array(coded_img_path)
-    msg = ''
-
-    for row, coded_row in  zip(img_array, coded_img_array):
-        for pair_pixel, pair_pixel_coded in zip(pair_pixels(row), pair_pixels(coded_row)):
-            msg += decoded_pixel(pair_pixel, pair_pixel_coded)
-    return msg
-
+#CodePixel('/home/an/Pulpit/a.jpg', 'kkgk')
+#b = DecodedPixel("/home/an/Pulpit/a.jpg", "/home/an/PycharmProjects/pixel_cipher/convert.png")
+#print(b)
