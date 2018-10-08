@@ -50,38 +50,36 @@ class CodePixel(PixelCipher):
         img.save(path)
 
     def is_rgb_overload(self, pixel_first, pixel_second):
-        is_overload_rgb = False
+        overload = False
         is_overload = lambda pixel :any([ elem > 254 for elem in pixel])
-
         if is_overload(pixel_first) or is_overload(pixel_second):
-            is_overload_rgb = True
-        return is_overload_rgb
+            overload = True
+        return overload
 
-    def code_letter_to_bin(self, msg):
+    def coded_letter_to_bin(self, msg):
         for elem in msg:
             yield '{:06b}'.format(self.letter_to_number[elem])
 
-    def coded_pixel(self, to_code, first_pixel, second_pixel):
+    def coded_pixels(self, bin_letter, first_pixel, second_pixel):
         iteration = 0
-        for elem in to_code:
-            if elem == '1':
+        for bit in bin_letter:
+            if bit == '1':
                 if iteration > 2:
                     second_pixel[iteration - 3] += 1
-                elif elem == '1':
+                elif bit == '1':
                     first_pixel[iteration] += 1
             iteration += 1
 
     def coded_img(self, img_path, msg):
-        img_array = self.img_to_pixels_array(img_path)
-        get_code_letter = iter(self.code_letter_to_bin(msg))
-        for row in img_array:
+        pixels_array = self.img_to_pixels_array(img_path)
+        get_bin_letter = iter(self.coded_letter_to_bin(msg))
+        for row in pixels_array:
             for first_pixel, second_pixel in self.pair_pixels(row):
                 if not self.is_rgb_overload(first_pixel, second_pixel):
                     try:
-                        to_code = next(get_code_letter)
-                        self.coded_pixel(to_code, first_pixel, second_pixel)
+                        self.coded_pixels(next(get_bin_letter), first_pixel, second_pixel)
                     except StopIteration:
-                        return img_array
+                        return pixels_array
 
 
 
@@ -92,30 +90,31 @@ class DecodedPixel(PixelCipher):
         self.number_to_letter = self.CFG["number_to_letter"]
         self.decoded_msg = self.decoded_img(img_orginal, img_coded)
 
+
     def __str__(self):
         return self.decoded_msg
 
     def decoded_pixel(self, pair_pixel, pair_coded_pixel):
-        orginal = [*pair_pixel[0], *pair_pixel[1]]
+        original = [*pair_pixel[0], *pair_pixel[1]]
         coded = [*pair_coded_pixel[0], *pair_coded_pixel[1]]
-        code = ''
-        for org, cod in zip(orginal, coded):
-            code += (str(cod - org))
-        if str(int(code, 2)) in self.number_to_letter.keys():
-            decoded_pixel = self.number_to_letter[str((int(code, 2)))]
+        bin_code = ''
+        for org, cod in zip(original, coded):
+            bin_code += (str(cod - org))
+        if str(int(bin_code, 2)) in self.number_to_letter.keys():
+            decoded_pixel = self.number_to_letter[str((int(bin_code, 2)))]
         else:
             decoded_pixel = ''
         return decoded_pixel
 
 
     def decoded_img(self, img_path, coded_img_path):
-        img_array = self.img_to_pixels_array(img_path)
+        pixels_array = self.img_to_pixels_array(img_path)
         coded_img_array = self.img_to_pixels_array(coded_img_path)
-        msg = ''
-        for row, coded_row in zip(img_array, coded_img_array):
+        encrypted_msg = ''
+        for row, coded_row in zip(pixels_array, coded_img_array):
             for pair_pixel, pair_pixel_coded in zip(self.pair_pixels(row), self.pair_pixels(coded_row)):
-                msg += self.decoded_pixel(pair_pixel, pair_pixel_coded)
-        return msg
+                encrypted_msg += self.decoded_pixel(pair_pixel, pair_pixel_coded)
+        return encrypted_msg
 
 
 class Message:
@@ -160,6 +159,6 @@ class Message:
         return False
 
 
-#CodePixel('/home/an/Pulpit/a.jpg', 'kkgk')
-#b = DecodedPixel("/home/an/Pulpit/a.jpg", "/home/an/PycharmProjects/pixel_cipher/convert.png")
-#print(b)
+CodePixel('/home/an/Pulpit/a.jpg', 'kkgk')
+b = DecodedPixel("/home/an/Pulpit/a.jpg", "/home/an/PycharmProjects/pixel_cipher/convert.png")
+print(b)
