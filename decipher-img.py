@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
-import image_cipher as ic
+from pixel_cipher import DecodedPixel
 
 description = """
 This program coded message in img
@@ -9,10 +9,10 @@ This program coded message in img
 
 parser = argparse.ArgumentParser(description=description)
 
-parser.add_argument('--orginal','-o',
+parser.add_argument('--original-img','-o',
                     required=True)
 
-parser.add_argument('--coded', '-c',
+parser.add_argument('--cipher-img', '-c',
                     required=True)
 
 parser.add_argument('--version', '-v',
@@ -20,10 +20,5 @@ parser.add_argument('--version', '-v',
                     version='%(prog)s 1.0',)
 
 args = parser.parse_args()
-
-path_orginal = args.orginal
-path_coded = args.coded
-
-
-decoded_msg = ic.decoded_img(path_orginal, path_coded)
-print(decoded_msg)
+decipher = DecodedPixel(args.original_img, args.cipher_img)
+print(decipher)
