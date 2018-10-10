@@ -1,8 +1,9 @@
 #!/usr/bin/python3
+import json
+import os
 from PIL import Image
 import numpy as np
-import os
-import json
+
 
 class PixelCipher:
 
@@ -28,9 +29,7 @@ class PixelCipher:
     def pair_pixels(self, row):
         return zip(row[0::2], row[1::2])
 
-
 class CodePixel(PixelCipher):
-
     def __init__(self, img, msg):
         super().__init__()
         self.letter_to_number = self.cfg["letter_to_number"]
@@ -50,14 +49,13 @@ class CodePixel(PixelCipher):
         img.save(path)
 
     def is_rgb_overload(self, pixel_first, pixel_second):
-        if any([ elem > 254 for elem in [*pixel_first, *pixel_second]]):
+        if any([elem > 254 for elem in [*pixel_first, *pixel_second]]):
             return  True
         return False
 
     def coded_letter_to_bin(self, msg):
         for sign in msg:
             yield '{:06b}'.format(self.letter_to_number[sign])
-
 
     def coded_pixels(self, bin_letter, first_pixel, second_pixel):
         iteration = 0
@@ -80,15 +78,11 @@ class CodePixel(PixelCipher):
                     except StopIteration:
                         return pixels_array
 
-
-
 class DecodedPixel(PixelCipher):
-
     def __init__(self, img_orginal, img_coded):
         super().__init__()
         self.number_to_letter = self.cfg["number_to_letter"]
         self.decoded_msg = self.decoded_img(img_orginal, img_coded)
-
 
     def __str__(self):
         return self.decoded_msg
@@ -105,7 +99,6 @@ class DecodedPixel(PixelCipher):
             decoded_pixel = ''
         return decoded_pixel
 
-
     def decoded_img(self, img_path, coded_img_path):
         pixels_array = self.img_to_pixels_array(img_path)
         coded_img_array = self.img_to_pixels_array(coded_img_path)
@@ -114,7 +107,6 @@ class DecodedPixel(PixelCipher):
             for pair_pixel, pair_pixel_coded in zip(self.pair_pixels(row), self.pair_pixels(coded_row)):
                 encrypted_msg += self.decoded_pixel(pair_pixel, pair_pixel_coded)
         return encrypted_msg
-
 
 class Message:
     def __init__(self, cipher_message):
